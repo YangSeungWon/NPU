@@ -84,6 +84,51 @@ void Mesh<INPUT_T, OUTPUT_T, ACC_T>::calculate()
                 tmp_a[i] = 0;
         }
     }
+    else if (cur->control.stationary == Stationary::output)
+    {
+        if (cur->progress < cur->size)
+        {
+            for (; i < cur->progress + 1; i++)
+                tmp_a[i] = cur->in_a->get(i, cur->size - cur->progress + i - 1);
+
+            for (; i < cur->size; i++)
+                tmp_a[i] = 0;
+        }
+        else if (cur->progress < 2 * cur->size)
+        {
+            if (waiting.size() > 1 
+                && waiting[1].progress < waiting[1].size
+                && waiting[1].control.stationary == Stationary::output) // more calc waiting
+            {
+                auto *next = &waiting[1];
+                for (; i < next->progress + 1; i++)
+                    tmp_a[i] = next->in_a->get(i, next->size - next->progress + i - 1);
+            }
+            for (; i < cur->progress - cur->size + 1; i++)
+                tmp_a[i] = 0;
+
+            for (; i < cur->size; i++)
+                tmp_a[i] = cur->in_a->get(i, i - cur->progress + cur->size - 1);
+        }
+        else
+        {
+            if (waiting.size() > 1 
+                && waiting[1].progress < 2 * waiting[1].size
+                && waiting[1].control.stationary == Stationary::output) // more calc waiting
+            {
+                auto *next = &waiting[1];
+                for (; i < next->progress - next->size + 1; i++)
+                    tmp_a[i] = 0;
+
+                for (; i < next->size; i++)
+                    tmp_a[i] = next->in_a->get(i, i - next->progress + next->size - 1);
+            }
+            
+            for (; i < cur->size; i++)
+                tmp_a[i] = 0;
+        }
+    }
+
     for (uint32_t i_tile = 0; i_tile < rows; i_tile++)
         tile_table(i_tile,0).input_a(&tmp_a[tile_rows * i_tile]);
 
@@ -161,6 +206,74 @@ void Mesh<INPUT_T, OUTPUT_T, ACC_T>::calculate()
             }
         }
     }
+    else if (cur->control.stationary == Stationary::output)
+    {
+        if (cur->progress < cur->size) // 
+        {
+            for (; j < cur->progress + 1; j++) {
+                tmp_b[j] = cur->in_b->get(cur->size - cur->progress + j - 1, j);
+                tmp_d[j] = cur->in_d->get(cur->size - cur->progress + j - 1, j);
+                tmp_ctrl[j] = cur->control;
+            }
+            for (; j < cur->size; j++) {
+                tmp_b[j] = 0;
+                tmp_d[j] = 0;
+                tmp_ctrl[j] = ctrl_default;
+            }
+        }
+        else if (cur->progress < 2 * cur->size)
+        {
+            if (waiting.size() > 1 
+                && waiting[1].progress < waiting[1].size
+                && waiting[1].control.stationary == Stationary::output) // more calc waiting
+            {
+                auto *next = &waiting[1];
+                for (; j < next->progress + 1; j++) {
+                    tmp_b[j] = next->in_b->get(next->size - next->progress + j - 1, j);
+                    tmp_d[j] = next->in_d->get(next->size - next->progress + j - 1, j);
+                    tmp_ctrl[j] = next->control;
+                }
+            }
+            for (; j < cur->progress - cur->size + 1; j++) {
+                tmp_b[j] = 0;
+                tmp_d[j] = 0;
+                tmp_ctrl[j] = ctrl_default;
+            }
+
+            for (; j < cur->size; j++) {
+                tmp_b[j] = cur->in_b->get(j - cur->progress + cur->size - 1, j);
+                tmp_d[j] = cur->in_d->get(j - cur->progress + cur->size - 1, j);
+                tmp_ctrl[j] = cur->control;
+            }
+        }
+        else
+        {
+            if (waiting.size() > 1 
+                && waiting[1].progress < 2 * waiting[1].size
+                && waiting[1].control.stationary == Stationary::output) // more calc waiting
+            {
+                auto *next = &waiting[1];
+                for (; j < next->progress - next->size + 1; j++) {
+                    tmp_b[j] = 0;
+                    tmp_d[j] = 0;
+                    tmp_ctrl[j] = ctrl_default;
+                }
+
+                for (; j < next->size; j++) {
+                    tmp_b[j] = next->in_b->get(j - next->progress + next->size - 1, j);
+                    tmp_d[j] = next->in_d->get(j - next->progress + next->size - 1, j);
+                    tmp_ctrl[j] = next->control;
+                }
+            }
+
+            for (; j < cur->size; j++) {
+                tmp_b[j] = 0;
+                tmp_d[j] = 0;
+                tmp_ctrl[j] = ctrl_default;
+            }
+        }
+    }
+
     for (uint32_t j_tile = 0; j_tile < columns; j_tile++)
     {
         tile_table(0,j_tile).input_b(&tmp_b[tile_columns * j_tile]);
@@ -202,6 +315,11 @@ void Mesh<INPUT_T, OUTPUT_T, ACC_T>::calculate()
                 if (waiting[1].preload < waiting[1].size)
                     waiting[1].preload += 1;
                 else
+                    waiting[1].progress += 1;
+            }
+            else if (waiting[1].control.stationary == Stationary::output)
+            {
+                if (cur->progress > cur->size)
                     waiting[1].progress += 1;
             }
         }
@@ -251,6 +369,44 @@ void Mesh<INPUT_T, OUTPUT_T, ACC_T>::calculate()
             }
         }
     }
+    else if (cur->control.stationary == Stationary::output)
+    {
+        if (waiting.size() > 1 && waiting[1].progress > waiting[1].size)
+        {
+            auto *next = &waiting[1];
+            for (uint32_t i=0; i<next->progress - next->size; i++)
+            {
+                uint32_t x = next->progress - next->size - i - 1;
+                if (x >= next->size) continue;
+                if (i >= next->size) continue;
+                next->out_c->get(x, i) = tile_table(x/tile_rows, i/tile_rows).processing_element_table(x%tile_rows, i%tile_rows).out_c;
+                std::cout << "[Next] Output : " << x << " " << i << " - " << next->out_c->get(x, i) << '\n';
+            }
+        }
+
+        if (cur->progress > cur->size)
+        {
+            uint32_t cnt = 0;
+            for (uint32_t i=0; i<cur->progress - cur->size; i++)
+            {
+                uint32_t x = cur->progress - cur->size - i - 1;
+                if (x >= cur->size) continue;
+                if (i >= cur->size) continue;
+                cnt++;
+                cur->out_c->get(x, i) = tile_table(x/tile_rows, i/tile_rows).processing_element_table(x%tile_rows, i%tile_rows).out_c;
+                std::cout << "[Curr] Output : " << x << " " << i << " - " << cur->out_c->get(x, i) << '\n';
+            }
+
+            if (cnt == 1 && cur->progress > cur->size + 1){
+                std::cout << "[+] end of a calculation.\n";
+                std::cout << "   consumed clock from the beginning: " << clock << '\n';
+                *(cur->finished) = true;
+                waiting.erase(waiting.begin());
+            }
+        }
+    }
+
+
 }
 
 template <typename INPUT_T, typename OUTPUT_T, typename ACC_T>
