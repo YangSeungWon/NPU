@@ -19,6 +19,9 @@ public:
     void input_d(OUTPUT_T *data);
     void input_ctrl(control_t *data);
     ~Tile();
+    template <typename INPUT_T_, typename OUTPUT_T_, typename ACC_T_>
+    friend std::ostream &operator<<(std::ostream &os, const Tile<INPUT_T_, OUTPUT_T_, ACC_T_> &tile);
+
     Matrix<ProcessingElement<INPUT_T, OUTPUT_T, ACC_T>> processing_element_table;
 
     INPUT_T *in_a;

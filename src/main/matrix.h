@@ -18,6 +18,9 @@ public:
     T &operator()(uint32_t i, uint32_t j) { assert(i>=0 && i<rows); assert(j>=0 && j<columns); return *matrix[i][j]; }
     const T &operator()(uint32_t i, uint32_t j) const { assert(i>=0 && i<rows); assert(j>=0 && j<columns); return *matrix[i][j]; }
     Matrix<T> &operator=(const Matrix<T> &mat);
+    template <typename T_>
+    friend std::ostream &operator<<(std::ostream &os, const Matrix<T_> &matrix);
+
 private:
     T ***matrix;
     uint32_t rows;

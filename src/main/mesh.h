@@ -32,7 +32,9 @@ public:
     };
     Mesh(uint32_t _rows, uint32_t _columns, uint32_t _tile_rows, uint32_t _tile_columns);
     void calculate();
-
+    
+    template <typename INPUT_T_, typename OUTPUT_T_, typename ACC_T_>
+    friend std::ostream &operator<<(std::ostream &os, const Mesh<INPUT_T_, OUTPUT_T_, ACC_T_> &mesh);
 
     Matrix<Tile<INPUT_T, OUTPUT_T, ACC_T>> tile_table;
     std::vector<Request> waiting;

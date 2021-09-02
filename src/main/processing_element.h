@@ -29,6 +29,10 @@ public:
     void input_d(INPUT_T data);
     void input_d(OUTPUT_T data);
     void input_ctrl(control_t data);
+
+    template <typename INPUT_T_, typename OUTPUT_T_, typename ACC_T_>
+    friend std::ostream &operator<<(std::ostream &os, const ProcessingElement<INPUT_T_, OUTPUT_T_, ACC_T_> &pe);
+    
     uint32_t latency;
 
     INPUT_T in_a;
